@@ -11,6 +11,7 @@ import edu.cwru.sepia.environment.model.history.History.HistoryView;
 import edu.cwru.sepia.environment.model.state.State;
 import edu.cwru.sepia.environment.model.state.State.StateView;
 import edu.cwru.sepia.environment.model.state.Unit;
+import edu.cwru.sepia.util.DistanceMetrics;
 
 import java.io.*;
 import java.util.*;
@@ -362,8 +363,43 @@ public class RLAgent extends Agent {
                                            History.HistoryView historyView,
                                            int attackerId,
                                            int defenderId) {
-        return null;
+    	int size = 3; //HOW BIG DOES THIS NEED TO BE FIXME FIXME
+    	double[] vector = new double[size];
+    	vector[0] = 1;
+    	vector[1] = isClosestEnemy(stateView, attackerId, defenderId); //for now, only care about attacking closest enemy...
+        return vector;
     }
+    /**
+     * @param stateview
+     * @param unitId- is the id of the attacking unit
+     * @param enemyId - id of defending unit
+     * @return 1 if enemy is the closest enemy to unit, -1 otherwise
+     */
+    private int isClosestEnemy(State.StateView stateview, int unitId, int enemyId) { 
+    	int closestEnemy = -1;
+    	int distance = Integer.MAX_VALUE;
+    	List<Integer> idList = stateview.getUnitIds(enemyId); 
+    	Unit.UnitView unitview = stateview.getUnit(unitId); 
+    	if(unitview == null) {
+    		return 1; //doesn't matter if there is no unit
+    	}
+    	Iterator<Integer> iterator = idList.iterator(); 
+    	
+    	while(iterator.hasNext()) { 
+	    	int nextEnemyId = iterator.next(); 
+	    	Unit.UnitView nextEnemy = stateview.getUnit(nextEnemyId);
+	    	int dist = DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), nextEnemy.getXPosition(), nextEnemy.getYPosition()); 
+	    	if(dist < distance) { 
+	    		closestEnemy = nextEnemyId; 
+	    		distance = dist; 
+	    	} 
+    	}  
+    	if(enemyId != closestEnemy) {
+    		return -1; 
+    	} else {
+    		return 1;
+    	}
+	}
 
     /**
      * DO NOT CHANGE THIS!
