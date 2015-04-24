@@ -217,7 +217,7 @@ public class RLAgent extends Agent {
                                              //not sure if this is right, \  -------------supposed to be Q(s',a')-------/ \--------supposed to be Q(s,a)---------------------/
               newWeights[i]=oldWeights[i]+learningRate*(totalReward+gamma*getMaxQ(stateView,historyView,footmanId).getQ()+calcQFromWeightsAndFeatures(oldWeights,oldFeatures))*oldFeatures[i];
          }
-        return null;
+        return newWeights;
     }
 
     /**
@@ -363,11 +363,57 @@ public class RLAgent extends Agent {
                                            History.HistoryView historyView,
                                            int attackerId,
                                            int defenderId) {
-    	int size = 3; //HOW BIG DOES THIS NEED TO BE FIXME FIXME
+    	int size = 10; //HOW BIG DOES THIS NEED TO BE FIXME FIXME
     	double[] vector = new double[size];
     	vector[0] = 1;
-    	vector[1] = isClosestEnemy(stateView, attackerId, defenderId); //for now, only care about attacking closest enemy...
+    	vector[1] = getInverseDistance(stateView, attackerId, defenderId); 
+    	vector[2] = getHitpointRatio(stateView, attackerId, defenderId);
+    	vector[3] = getNumFootmenAttacking(stateView, historyView, attackerId, defenderId);
         return vector;
+    }
+   
+    private double getNumFootmenAttacking(StateView stateView, HistoryView historyView, int attackerId, int defenderId) {
+    	int lastTurnNumber = stateView.getTurnNumber() - 1;
+    	if(lastTurnNumber < 1) {
+    		return 0; // should this be 0 or 1?
+    	}
+    	int count = 0;
+    	for(DamageLog damageLogs : historyView.getDamageLogs(lastTurnNumber)) {
+    	         if(damageLogs.getDefenderID() == defenderId) {
+    	        	 count++;
+    	         }
+    	}
+		return count;
+	}
+
+	/**
+     * @param stateview
+     * @param unitId- is the id of the attacking unit
+     * @param enemyId - id of defending unit
+     * @return then inverse distance from unit to enemy
+     */
+    private double getHitpointRatio(State.StateView stateview, int unitId, int enemyId) {
+    	Unit.UnitView unitview = stateview.getUnit(unitId); 
+    	Unit.UnitView enemy = stateview.getUnit(enemyId);
+    	if(unitview == null || enemy == null) {
+    		return -1; //DO NOT WANT IF UNIT OR ENEMY DON'T EXIST
+    	}
+    	return unitview.getHP()/enemy.getHP(); // want to attack enemies with lower health
+    }
+    /**
+     * @param stateview
+     * @param unitId- is the id of the attacking unit
+     * @param enemyId - id of defending unit
+     * @return then inverse distance from unit to enemy
+     */
+    private double getInverseDistance(State.StateView stateview, int unitId, int enemyId) {
+    	Unit.UnitView unitview = stateview.getUnit(unitId); 
+    	Unit.UnitView enemy = stateview.getUnit(enemyId);
+    	if(unitview == null || enemy == null) {
+    		return -1; //DO NOT WANT IF UNIT OR ENEMY DON'T EXIST
+    	}
+    	double dist = DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), enemy.getXPosition(), enemy.getYPosition()); 
+    	return 1.0/dist;
     }
     /**
      * @param stateview
