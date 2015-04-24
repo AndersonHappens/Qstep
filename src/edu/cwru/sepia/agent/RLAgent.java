@@ -40,7 +40,7 @@ public class RLAgent extends Agent {
     /**
      * Set this to whatever size your feature vector is.
      */
-    public static final int NUM_FEATURES = 5;
+    public static final int NUM_FEATURES = 4;
 
     /** Use this random number generator for your epsilon exploration. When you submit we will
      * change this seed so make sure that your agent works for more than the default seed.
@@ -161,7 +161,7 @@ public class RLAgent extends Agent {
                    actions.put(myFootman, Action.createCompoundAttack(myFootman, selectAction(stateView,historyView,myFootman)));
               }
          }
-        return actions;
+         return actions;
     }
     
     /**
@@ -196,7 +196,7 @@ public class RLAgent extends Agent {
     public void terminalStep(State.StateView stateView, History.HistoryView historyView) {
 
         // MAKE SURE YOU CALL printTestData after you finish a test episode.
-
+        
         // Save your weights
         saveWeights(weights);
 
@@ -388,8 +388,7 @@ public class RLAgent extends Agent {
                                            History.HistoryView historyView,
                                            int attackerId,
                                            int defenderId) {
-    	int size = 10; //HOW BIG DOES THIS NEED TO BE FIXME FIXME
-    	double[] vector = new double[size];
+    	double[] vector = new double[NUM_FEATURES];
     	vector[0] = 1;
     	vector[1] = getInverseDistance(stateView, attackerId, defenderId); 
     	vector[2] = getHitpointRatio(stateView, attackerId, defenderId);
