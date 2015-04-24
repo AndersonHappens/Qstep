@@ -213,7 +213,8 @@ public class RLAgent extends Agent {
     public double[] updateWeights(double[] oldWeights, double[] oldFeatures, double totalReward, State.StateView stateView, History.HistoryView historyView, int footmanId) {
          double[] newWeights=new double[oldWeights.length];
          for(int i=0;i<oldWeights.length;i++) {
-              newWeights[i]=oldWeights
+                                             //not sure if this is right, \  -------------supposed to be Q(s',a')-------/ \--------supposed to be Q(s,a)---------------------/
+              newWeights[i]=oldWeights[i]+learningRate*(totalReward+gamma*getMaxQ(stateView,historyView,footmanId).getQ()+calcQFromWeightsAndFeatures(oldWeights,oldFeatures))*oldFeatures[i];
          }
         return null;
     }
@@ -228,7 +229,7 @@ public class RLAgent extends Agent {
      * @return The enemy footman ID this unit should attack
      */
     public int selectAction(State.StateView stateView, History.HistoryView historyView, int attackerId) {
-        return -1;
+        return getMaxQ(stateView,historyView,attackerId).getDefender();
     }
 
     /**
@@ -287,6 +288,56 @@ public class RLAgent extends Agent {
                              int attackerId,
                              int defenderId) {
         return 0;
+    }
+    
+    /**
+     * Returns the maximum Q-value and the associated action for a given attackerId
+     * @param stateView
+     * @param historyView
+     * @param attackerId
+     * @return max QValueUnits
+     */
+    private QValueUnits getMaxQ(State.StateView stateView, History.HistoryView historyView, int attackerId) {
+         QValueUnits actionInfo=new QValueUnits(Double.NEGATIVE_INFINITY,-1);
+         for(Integer defender:enemyFootmen) {
+              QValueUnits candidate=new QValueUnits(calcQValue(stateView,historyView,attackerId,defender),defender);
+              if(candidate.getQ()>actionInfo.getQ()) {
+                   actionInfo=candidate;
+              }
+         }
+         return actionInfo;
+    }
+    
+    private class QValueUnits {
+         private double q;
+         private int defender;
+         
+         private QValueUnits(double q, int defender) {
+              this.q=q;
+              this.defender=defender;
+         }
+
+         public double getQ() {
+              return q;
+         }
+         
+         public int getDefender() {
+              return defender;
+         }
+    }
+    
+    /**
+     * Calculates the approximate Q-value from the weights and features
+     * @param weights
+     * @param features
+     * @return approximate Q-value
+     */
+    private double calcQFromWeightsAndFeatures(double[] weights, double[] features) {
+         double q=0;
+         for(int i=0;i<weights.length;i++) {
+              q+=weights[i]*features[i];
+         }
+         return q;
     }
 
     /**
