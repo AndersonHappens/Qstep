@@ -172,13 +172,16 @@ public class RLAgent extends Agent {
      * @param historyView
      * @return whether the friendly units should be reassigned
      */
-    //working here
     private boolean triggerEventOccured(StateView stateView, HistoryView historyView) {
          if(stateView.getTurnNumber()==0 || !historyView.getDeathLogs(stateView.getTurnNumber()-1).isEmpty()) {
               return true;
-         } else {
-              return false;
          }
+         for(ActionResult result : historyView.getCommandFeedback(playernum, stateView.getTurnNumber() - 1).values()) {
+              if(result.getFeedback()!=ActionFeedback.INCOMPLETE) {
+                   return true;
+              }
+         }
+         return false;
     }
 
     /**
@@ -208,6 +211,10 @@ public class RLAgent extends Agent {
      * @return The updated weight vector.
      */
     public double[] updateWeights(double[] oldWeights, double[] oldFeatures, double totalReward, State.StateView stateView, History.HistoryView historyView, int footmanId) {
+         double[] newWeights=new double[oldWeights.length];
+         for(int i=0;i<oldWeights.length;i++) {
+              newWeights[i]=oldWeights
+         }
         return null;
     }
 
