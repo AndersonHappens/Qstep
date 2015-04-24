@@ -7,7 +7,9 @@ import edu.cwru.sepia.action.TargetedAction;
 import edu.cwru.sepia.environment.model.history.DamageLog;
 import edu.cwru.sepia.environment.model.history.DeathLog;
 import edu.cwru.sepia.environment.model.history.History;
+import edu.cwru.sepia.environment.model.history.History.HistoryView;
 import edu.cwru.sepia.environment.model.state.State;
+import edu.cwru.sepia.environment.model.state.State.StateView;
 import edu.cwru.sepia.environment.model.state.Unit;
 
 import java.io.*;
@@ -152,7 +154,30 @@ public class RLAgent extends Agent {
      */
     @Override
     public Map<Integer, Action> middleStep(State.StateView stateView, History.HistoryView historyView) {
-        return null;
+         Map<Integer, Action> actions=new HashMap<Integer, Action>();
+         if(triggerEventOccured(stateView, historyView)) {
+              for(Integer myFootman:myFootmen) {
+                   actions.put(myFootman, Action.createCompoundAttack(myFootman, selectAction(stateView,historyView,myFootman)));
+              }
+         }
+        return actions;
+    }
+    
+    /**
+     * Checks whether an event that triggers reallocation of friendly units occurs
+     * Trigger events: It is the first round
+     *                 A unit died in the previous round
+     *                 An attack was completed or failed
+     * @param stateView
+     * @param historyView
+     * @return whether the friendly units should be reassigned
+     */
+    private boolean triggerEventOccured(StateView stateView, HistoryView historyView) {
+         if(stateView.getTurnNumber()==0 || !historyView.getDeathLogs(stateView.getTurnNumber()-1).isEmpty()) {
+              return true;
+         } else {
+              return false;
+         }
     }
 
     /**
