@@ -157,7 +157,21 @@ public class RLAgent extends Agent {
     public Map<Integer, Action> middleStep(State.StateView stateView, History.HistoryView historyView) {
          Map<Integer, Action> actions=new HashMap<Integer, Action>();
          if(triggerEventOccured(stateView, historyView)) {
-              for(Integer myFootman:myFootmen) {
+        	 for(DeathLog deathLog : historyView.getDeathLogs(stateView.getTurnNumber() -1)) {
+        	          int k = myFootmen.indexOf(deathLog.getDeadUnitID());
+        	          int e = enemyFootmen.indexOf(deathLog.getDeadUnitID());
+        	          if(k > -1) {
+        	        	  myFootmen.remove(k);
+        	          } else if(e > -1) {
+        	        	  enemyFootmen.remove(e);
+        	          }
+        	     }
+        	 for(Integer myFootman: myFootmen) {
+        		 for(Integer enemy: enemyFootmen) {
+        			 weights = updateWeights(weights, calculateFeatureVector(stateView, historyView, myFootman, enemy), calculateReward(stateView, historyView, myFootman), stateView, historyView, myFootman); 
+        		 }
+        	 }
+        	  for(Integer myFootman:myFootmen) {
                    actions.put(myFootman, Action.createCompoundAttack(myFootman, selectAction(stateView,historyView,myFootman)));
               }
          }
@@ -212,8 +226,8 @@ public class RLAgent extends Agent {
      * @param footmanId The footman we are updating the weights for
      * @return The updated weight vector.
      */
-    public double[] updateWeights(double[] oldWeights, double[] oldFeatures, double totalReward, State.StateView stateView, History.HistoryView historyView, int footmanId) {
-         double[] newWeights=new double[oldWeights.length];
+    public Double[] updateWeights(Double[] oldWeights, double[] oldFeatures, double totalReward, State.StateView stateView, History.HistoryView historyView, int footmanId) {
+         Double[] newWeights=new Double[oldWeights.length];
          for(int i=0;i<oldWeights.length;i++) {
                                              //not sure if this is right, \  -------------supposed to be Q(s',a')-------/ \--------supposed to be Q(s,a)---------------------/ FIXME
               newWeights[i]=oldWeights[i]+learningRate*(totalReward+gamma*getMaxQ(stateView,historyView,footmanId).getQ()+calcQFromWeightsAndFeatures(oldWeights,oldFeatures))*oldFeatures[i];
@@ -358,7 +372,7 @@ public class RLAgent extends Agent {
      * @param features
      * @return approximate Q-value
      */
-    private double calcQFromWeightsAndFeatures(double[] weights, double[] features) {
+    private double calcQFromWeightsAndFeatures(Double[] weights, double[] features) {
          double q=0;
          for(int i=0;i<weights.length;i++) {
               q+=weights[i]*features[i];
@@ -407,7 +421,7 @@ public class RLAgent extends Agent {
     	        	 count++;
     	         }
     	}
-		return count;
+		return count/myFootmen.size();
 	}
 
 	/**
@@ -437,7 +451,7 @@ public class RLAgent extends Agent {
     		return -1; //DO NOT WANT IF UNIT OR ENEMY DON'T EXIST
     	}
     	double dist = DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), enemy.getXPosition(), enemy.getYPosition()); 
-    	return 1.0/dist;
+    	return 10.0/dist;
     }
     /**
      * @param stateview
