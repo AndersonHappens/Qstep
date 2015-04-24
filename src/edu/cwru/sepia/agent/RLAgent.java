@@ -172,6 +172,7 @@ public class RLAgent extends Agent {
      * @param historyView
      * @return whether the friendly units should be reassigned
      */
+    //working here
     private boolean triggerEventOccured(StateView stateView, HistoryView historyView) {
          if(stateView.getTurnNumber()==0 || !historyView.getDeathLogs(stateView.getTurnNumber()-1).isEmpty()) {
               return true;
