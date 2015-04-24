@@ -167,6 +167,7 @@ public class RLAgent extends Agent {
     /**
      * Checks whether an event that triggers reallocation of friendly units occurs
      * Trigger events: It is the first round
+     *                 A unit was damaged in the previous round
      *                 A unit died in the previous round
      *                 An attack was completed or failed
      * @param stateView
@@ -174,7 +175,7 @@ public class RLAgent extends Agent {
      * @return whether the friendly units should be reassigned
      */
     private boolean triggerEventOccured(StateView stateView, HistoryView historyView) {
-         if(stateView.getTurnNumber()==0 || !historyView.getDeathLogs(stateView.getTurnNumber()-1).isEmpty()) {
+         if(stateView.getTurnNumber()==0 || !historyView.getDeathLogs(stateView.getTurnNumber()-1).isEmpty() || !historyView.getDamageLogs(stateView.getTurnNumber()-1).isEmpty()) {
               return true;
          }
          for(ActionResult result : historyView.getCommandFeedback(playernum, stateView.getTurnNumber() - 1).values()) {
@@ -214,7 +215,7 @@ public class RLAgent extends Agent {
     public double[] updateWeights(double[] oldWeights, double[] oldFeatures, double totalReward, State.StateView stateView, History.HistoryView historyView, int footmanId) {
          double[] newWeights=new double[oldWeights.length];
          for(int i=0;i<oldWeights.length;i++) {
-                                             //not sure if this is right, \  -------------supposed to be Q(s',a')-------/ \--------supposed to be Q(s,a)---------------------/
+                                             //not sure if this is right, \  -------------supposed to be Q(s',a')-------/ \--------supposed to be Q(s,a)---------------------/ FIXME
               newWeights[i]=oldWeights[i]+learningRate*(totalReward+gamma*getMaxQ(stateView,historyView,footmanId).getQ()+calcQFromWeightsAndFeatures(oldWeights,oldFeatures))*oldFeatures[i];
          }
         return null;
@@ -267,7 +268,26 @@ public class RLAgent extends Agent {
      * @return The current reward
      */
     public double calculateReward(State.StateView stateView, History.HistoryView historyView, int footmanId) {
-        return 0;
+         int turnNumber=stateView.getTurnNumber()-1;
+         //-0.1 per turn
+         double reward=-0.1*turnNumber;
+         //+d for damage done, -d for damage received
+         for(DamageLog damageLog:historyView.getDamageLogs(turnNumber)) {
+              if(damageLog.getAttackerID()==footmanId) {
+                   reward+=damageLog.getDamage();
+              } else if(damageLog.getDefenderID()==footmanId) {
+                   reward-=damageLog.getDamage();
+              }
+         }
+         //+100 for enemy death, -100 for friendly death
+         for(DeathLog deathLog:historyView.getDeathLogs(turnNumber)) {
+              if(deathLog.getController()==playernum) {
+                   reward-=100;
+              } else if(deathLog.getController()==ENEMY_PLAYERNUM) {
+                   reward+=100;
+              }
+         }
+         return reward;
     }
 
     /**
@@ -288,7 +308,12 @@ public class RLAgent extends Agent {
                              History.HistoryView historyView,
                              int attackerId,
                              int defenderId) {
-        return 0;
+         double q=0;
+         double[] features=calculateFeatureVector(stateView,historyView, attackerId, defenderId);
+         for(int i=0;i<weights.length;i++) {
+              q+=weights[i]*features[i];
+         }
+         return q;
     }
     
     /**
