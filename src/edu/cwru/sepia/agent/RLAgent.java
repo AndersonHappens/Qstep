@@ -357,6 +357,7 @@ public class RLAgent extends Agent {
      * @param defenderId An enemy footman. The one you are considering attacking.
      * @return The array of feature function outputs.
      */
+    //JAKE CAN DO THIS THING HE THINKSES
     public double[] calculateFeatureVector(State.StateView stateView,
                                            History.HistoryView historyView,
                                            int attackerId,
