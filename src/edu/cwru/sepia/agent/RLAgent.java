@@ -40,7 +40,7 @@ public class RLAgent extends Agent {
     /**
      * Set this to whatever size your feature vector is.
      */
-    public static final int NUM_FEATURES = 4;
+    public static final int NUM_FEATURES = 5;
 
     /** Use this random number generator for your epsilon exploration. When you submit we will
      * change this seed so make sure that your agent works for more than the default seed.
@@ -198,12 +198,12 @@ public class RLAgent extends Agent {
         	          }
         	     }
         	 //update only if the current episode is not testing...
-        	 if(numEpisode % 10 != 0) { 
+        	 if(numEpisode % 10 != 0) {  
 	        	 Double maxweight = 1.0;
 	        	 Double[] avgUpdatedWeights=new Double[weights.length];
-	        	for(int i = 0; i<weights.length; i++) {
+	        	 for(int i = 0; i<weights.length; i++) {
                     avgUpdatedWeights[i]=new Double(0);
-               }
+	        	 }
 	        	 for(Integer myFootman: myFootmen) {
 	        		 for(Integer enemy: enemyFootmen) {
 	        			 Double[] weits = updateWeights(weights, calculateFeatureVector(stateView, historyView, myFootman, enemy), calculateReward(stateView, historyView, myFootman), stateView, historyView, myFootman);
@@ -212,18 +212,15 @@ public class RLAgent extends Agent {
 	        			 }
 	        		 }
 	        	 }
-	        	for(int i = 0; i<weights.length; i++) {
-                    avgUpdatedWeights[i] /= myFootmen.size()*enemyFootmen.size();
-                    if(avgUpdatedWeights[i]>maxweight) {
-                         maxweight=avgUpdatedWeights[i];
+	        	 for(int i = 0; i<weights.length; i++) {
+                    avgUpdatedWeights[i] /= (myFootmen.size()*enemyFootmen.size());
+                    if(Math.abs(avgUpdatedWeights[i])>maxweight) {
+                         maxweight=Math.abs(avgUpdatedWeights[i]);
                     }
-               }
-			 for(int i = 0; i<weights.length; i++) {
-			      avgUpdatedWeights[i] = avgUpdatedWeights[i]/maxweight;
-			 }
-			 for(int i = 0; i<weights.length; i++) {
-			      weights[i]=avgUpdatedWeights[i];
-                }
+	        	 }
+				 for(int i = 0; i<weights.length; i++) {
+				      weights[i]=avgUpdatedWeights[i]/maxweight;
+				 }
         	 }
         	  for(Integer myFootman:myFootmen) {
                    actions.put(myFootman, Action.createCompoundAttack(myFootman, selectAction(stateView,historyView,myFootman)));
@@ -264,7 +261,7 @@ public class RLAgent extends Agent {
     public void terminalStep(State.StateView stateView, History.HistoryView historyView) {
 
         // MAKE SURE YOU CALL printTestData after you finish a test episode.
-         	for(int i = 0; i<myFootmen.size(); i++) {
+         	for(int i = 0; i<myFootmen.size() && testEpisode != 0; i++) {
          		totalReward +=  calculateReward(stateView, historyView, myFootmen.get(i));
          	}
          	
@@ -474,13 +471,27 @@ public class RLAgent extends Agent {
     	vector[1] = getInverseDistance(stateView, attackerId, defenderId); 
     	vector[2] = getHitpointRatio(stateView, attackerId, defenderId);
     	vector[3] = getNumFootmenAttacking(stateView, historyView, attackerId, defenderId);
+    	vector[4] = isBeingAttacked(stateView, historyView, attackerId, defenderId);
         return vector;
     }
    
-    private double getNumFootmenAttacking(StateView stateView, HistoryView historyView, int attackerId, int defenderId) {
+    private double isBeingAttacked(StateView stateView, HistoryView historyView,  int attackerId, int defenderId) {
     	int lastTurnNumber = stateView.getTurnNumber() - 1;
     	if(lastTurnNumber < 1) {
-    		return 0; // should this be 0 or 1?
+    		return 0; 
+    	}
+    	for(DamageLog damageLogs : historyView.getDamageLogs(lastTurnNumber)) {
+    	         if(damageLogs.getDefenderID() == attackerId && damageLogs.getAttackerID() == defenderId) {
+    	        	 return 1;
+    	         }
+    	}
+    	return 0;
+	}
+
+	private double getNumFootmenAttacking(StateView stateView, HistoryView historyView, int attackerId, int defenderId) {
+    	int lastTurnNumber = stateView.getTurnNumber() - 1;
+    	if(lastTurnNumber < 1) {
+    		return 0; 
     	}
     	int count = 0;
     	for(DamageLog damageLogs : historyView.getDamageLogs(lastTurnNumber)) {
@@ -520,37 +531,6 @@ public class RLAgent extends Agent {
     	double dist = DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), enemy.getXPosition(), enemy.getYPosition()); 
     	return 1.0/dist;
     }
-    /**
-     * @param stateview
-     * @param unitId- is the id of the attacking unit
-     * @param enemyId - id of defending unit
-     * @return 1 if enemy is the closest enemy to unit, -1 otherwise
-     */
-    private int isClosestEnemy(State.StateView stateview, int unitId, int enemyId) { 
-    	int closestEnemy = -1;
-    	int distance = Integer.MAX_VALUE;
-    	List<Integer> idList = stateview.getUnitIds(enemyId); 
-    	Unit.UnitView unitview = stateview.getUnit(unitId); 
-    	if(unitview == null) {
-    		return 1; //doesn't matter if there is no unit
-    	}
-    	Iterator<Integer> iterator = idList.iterator(); 
-    	
-    	while(iterator.hasNext()) { 
-	    	int nextEnemyId = iterator.next(); 
-	    	Unit.UnitView nextEnemy = stateview.getUnit(nextEnemyId);
-	    	int dist = DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), nextEnemy.getXPosition(), nextEnemy.getYPosition()); 
-	    	if(dist < distance) { 
-	    		closestEnemy = nextEnemyId; 
-	    		distance = dist; 
-	    	} 
-    	}  
-    	if(enemyId != closestEnemy) {
-    		return -1; 
-    	} else {
-    		return 1;
-    	}
-	}
 
     /**
      * DO NOT CHANGE THIS!
