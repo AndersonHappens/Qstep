@@ -64,6 +64,10 @@ public class RLAgent extends Agent {
      */
     public double totalReward = 0;
     /**
+     * List of average rewards from tests
+     */
+    ArrayList<Double> testList = new ArrayList<Double>();
+    /**
      * These variables are set for you according to the assignment definition. You can change them,
      * but it is not recommended. If you do change them please let us know and explain your reasoning for
      * changing them.
@@ -243,15 +247,19 @@ public class RLAgent extends Agent {
     public void terminalStep(State.StateView stateView, History.HistoryView historyView) {
 
         // MAKE SURE YOU CALL printTestData after you finish a test episode.
-    	System.out.println("numEpisodes is " + numEpisode + " number of test episodes is " + testEpisode);
-    	ArrayList<Double> testList = new ArrayList<Double>();
+    	//System.out.println("numEpisodes is " + numEpisode + " number of test episodes is " + testEpisode);
+
     	for(int i = 0; i<myFootmen.size(); i++) {
     		totalReward +=  calculateReward(stateView, historyView, myFootmen.get(i));
     	}
-    	testList.add(totalReward/5.0);
-    	if(numEpisode % 10 == 0 && testEpisode != 0 && testEpisode % 5 == 0) { 
-    		printTestData(testList);
+    	
+    	if(testEpisode != 0 && testEpisode % 5 == 0) {
+        	testList.add(totalReward/5.0);
     		totalReward = 0;
+    	}
+    	
+    	if(numEpisode != 0 && numEpisode % numEpisodes == 0 && testEpisode != 0 && testEpisode % 5 == 0) { 
+    		printTestData(testList);
     	}
         // Save your weights
         saveWeights(weights);
@@ -477,7 +485,7 @@ public class RLAgent extends Agent {
     	if(unitview == null || enemy == null) {
     		return -1; //DO NOT WANT IF UNIT OR ENEMY DON'T EXIST
     	}
-    	return unitview.getHP()/enemy.getHP(); // want to attack enemies with lower health
+    	return unitview.getHP()/(unitview.getHP() + enemy.getHP()); // want to attack enemies with lower health
     }
     /**
      * @param stateview
@@ -492,7 +500,7 @@ public class RLAgent extends Agent {
     		return -1; //DO NOT WANT IF UNIT OR ENEMY DON'T EXIST
     	}
     	double dist = DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), enemy.getXPosition(), enemy.getYPosition()); 
-    	return 10.0/dist;
+    	return 1.0/dist;
     }
     /**
      * @param stateview
