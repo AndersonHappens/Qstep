@@ -78,6 +78,9 @@ public class RLAgent extends Agent {
     
     //modifiable epsilon for applying decay in the initial step
     private double decayedEpsilon=epsilon;
+    private State.StateView oldStateView;
+    private History.HistoryView oldHistoryView;
+    private HashMap<Integer,Integer> lastTargets;
 
     public RLAgent(int playernum, String[] args) {
         super(playernum);
@@ -186,6 +189,7 @@ public class RLAgent extends Agent {
      */
     @Override
     public Map<Integer, Action> middleStep(State.StateView stateView, History.HistoryView historyView) {
+         //System.out.println(Arrays.toString(weights));
          Map<Integer, Action> actions=new HashMap<Integer, Action>();
          if(triggerEventOccured(stateView, historyView)) {
         	 for(DeathLog deathLog : historyView.getDeathLogs(stateView.getTurnNumber() -1)) {
@@ -198,33 +202,42 @@ public class RLAgent extends Agent {
         	          }
         	     }
         	 //update only if the current episode is not testing...
-        	 if(numEpisode % 10 != 0) {  
-	        	 Double maxweight = 1.0;
+        	 if(numEpisode % 10 != 0 && numEpisode>1) {
+        	      Double maxweight = Double.NEGATIVE_INFINITY;
 	        	 Double[] avgUpdatedWeights=new Double[weights.length];
 	        	 for(int i = 0; i<weights.length; i++) {
                     avgUpdatedWeights[i]=new Double(0);
 	        	 }
+	        	 int numNewWeights=0;
 	        	 for(Integer myFootman: myFootmen) {
-	        		 for(Integer enemy: enemyFootmen) {
-	        			 Double[] weits = updateWeights(weights, calculateFeatureVector(stateView, historyView, myFootman, enemy), calculateReward(stateView, historyView, myFootman), stateView, historyView, myFootman);
-	        			 for(int i = 0; i<weights.length; i++) {
-	        			      avgUpdatedWeights[i] += weits[i];
-	        			 }
-	        		 }
+	        	      if(lastTargets.get(myFootman)!=null) {
+     	        		 Double[] weits = updateWeights(weights, calculateFeatureVector(oldStateView, oldHistoryView, myFootman, lastTargets.get(myFootman)), calculateReward(stateView, historyView, myFootman), stateView, historyView, myFootman);
+             			 for(int i = 0; i<weights.length; i++) {
+             			      avgUpdatedWeights[i] += weits[i];
+             			 }
+             			 numNewWeights+=1;
+	        	      }
 	        	 }
-	        	 for(int i = 0; i<weights.length; i++) {
-                    avgUpdatedWeights[i] /= (myFootmen.size()*enemyFootmen.size());
-                    if(Math.abs(avgUpdatedWeights[i])>maxweight) {
-                         maxweight=Math.abs(avgUpdatedWeights[i]);
-                    }
+	        	 if(numNewWeights>0) {
+     	        	 for(int i = 0; i<weights.length; i++) {
+                         avgUpdatedWeights[i] /= numNewWeights;
+                         if(Math.abs(avgUpdatedWeights[i])>maxweight) {
+                              maxweight=Math.abs(avgUpdatedWeights[i]);
+                         }
+     	        	 }
+     			 for(int i = 0; i<weights.length; i++) {
+     			      weights[i]=avgUpdatedWeights[i]/maxweight;
+     			 }
 	        	 }
-				 for(int i = 0; i<weights.length; i++) {
-				      weights[i]=avgUpdatedWeights[i]/maxweight;
-				 }
         	 }
-        	  for(Integer myFootman:myFootmen) {
-                   actions.put(myFootman, Action.createCompoundAttack(myFootman, selectAction(stateView,historyView,myFootman)));
-              }
+        	 lastTargets=new HashMap<Integer,Integer>();
+   	      for(Integer myFootman:myFootmen) {
+   	           int target=selectAction(stateView,historyView,myFootman);
+   	           actions.put(myFootman, Action.createCompoundAttack(myFootman, target));
+   	           lastTargets.put(myFootman, target);
+   	       }
+        	  oldHistoryView=historyView;
+        	  oldStateView=stateView;
          }
          return actions;
     }
@@ -290,7 +303,7 @@ public class RLAgent extends Agent {
     public Double[] updateWeights(Double[] oldWeights, double[] oldFeatures, double totalReward, State.StateView stateView, History.HistoryView historyView, int footmanId) {
          Double[] newWeights=new Double[oldWeights.length];
          for(int i=0;i<oldWeights.length;i++) {
-              newWeights[i]=oldWeights[i]+learningRate*(totalReward+gamma*getMaxQ(stateView,historyView,footmanId).getQ()+calcQFromWeightsAndFeatures(oldWeights,oldFeatures))*oldFeatures[i];
+              newWeights[i]=oldWeights[i]-learningRate*(totalReward+gamma*getMaxQ(stateView,historyView,footmanId).getQ()+calcQFromWeightsAndFeatures(oldWeights,oldFeatures))*oldFeatures[i];
          }
         return newWeights;
     }
@@ -471,11 +484,12 @@ public class RLAgent extends Agent {
     	vector[1] = getInverseDistance(stateView, attackerId, defenderId); 
     	vector[2] = getHitpointRatio(stateView, attackerId, defenderId);
     	vector[3] = getNumFootmenAttacking(stateView, historyView, attackerId, defenderId);
-    	vector[4] = isBeingAttacked(stateView, historyView, attackerId, defenderId);
+    	vector[4] = isBeingAttackedBy(stateView, historyView, attackerId, defenderId);
+    	//vector[5] = getDistance(stateView, attackerId, defenderId);
         return vector;
     }
    
-    private double isBeingAttacked(StateView stateView, HistoryView historyView,  int attackerId, int defenderId) {
+    private double isBeingAttackedBy(StateView stateView, HistoryView historyView,  int attackerId, int defenderId) {
     	int lastTurnNumber = stateView.getTurnNumber() - 1;
     	if(lastTurnNumber < 1) {
     		return 0; 
@@ -530,6 +544,15 @@ public class RLAgent extends Agent {
     	}
     	double dist = DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), enemy.getXPosition(), enemy.getYPosition()); 
     	return 1.0/dist;
+    }
+    
+    private double getDistance(State.StateView stateView, int unitId, int enemyId) {
+         Unit.UnitView unitview = stateView.getUnit(unitId); 
+         Unit.UnitView enemy = stateView.getUnit(enemyId);
+         if(unitview == null || enemy == null) {
+              return -1; //DO NOT WANT IF UNIT OR ENEMY DON'T EXIST
+         }
+         return DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), enemy.getXPosition(), enemy.getYPosition());  
     }
 
     /**
