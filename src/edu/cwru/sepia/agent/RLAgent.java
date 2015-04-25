@@ -75,6 +75,9 @@ public class RLAgent extends Agent {
     public final double gamma = 0.9;
     public final double learningRate = .0001;
     public final double epsilon = .02;
+    
+    //modifiable epsilon for applying decay in the initial step
+    private double decayedEpsilon=epsilon;
 
     public RLAgent(int playernum, String[] args) {
         super(playernum);
@@ -112,16 +115,20 @@ public class RLAgent extends Agent {
     public Map<Integer, Action> initialStep(State.StateView stateView, History.HistoryView historyView) {
 
         // You will need to add code to check if you are in a testing or learning episode
-    	if(numEpisode % 10 == 0 && (testEpisode == 0 || testEpisode %5 != 0)) {
-    		testEpisode++;
-    	} else {
-    		testEpisode = 0;
-    		numEpisode++;
-    	}
-    	if(numEpisode>numEpisodes) {
-    		System.out.println(numEpisodes + " completed. Quitting...");
-    		System.exit(0);
-    	}
+         	if(numEpisode % 10 == 0 && (testEpisode == 0 || testEpisode %5 != 0)) {
+         		testEpisode++;
+         	} else {
+         		testEpisode = 0;
+         		numEpisode++;
+         	}
+         	if(numEpisode>numEpisodes) {
+         		System.out.println(numEpisodes + " completed. Quitting...");
+         		System.exit(0);
+         	}
+    	
+         	//decay epsilon
+         	decayedEpsilon=epsilon*Math.pow(0.9, numEpisode);
+
         // Find all of your units
         myFootmen = new LinkedList<>();
         for (Integer unitId : stateView.getUnitIds(playernum)) {
@@ -193,20 +200,30 @@ public class RLAgent extends Agent {
         	 //update only if the current episode is not testing...
         	 if(numEpisode % 10 != 0) { 
 	        	 Double maxweight = 1.0;
+	        	 Double[] avgUpdatedWeights=new Double[weights.length];
+	        	for(int i = 0; i<weights.length; i++) {
+                    avgUpdatedWeights[i]=new Double(0);
+               }
 	        	 for(Integer myFootman: myFootmen) {
 	        		 for(Integer enemy: enemyFootmen) {
 	        			 Double[] weits = updateWeights(weights, calculateFeatureVector(stateView, historyView, myFootman, enemy), calculateReward(stateView, historyView, myFootman), stateView, historyView, myFootman);
 	        			 for(int i = 0; i<weights.length; i++) {
-	        				 weights[i] += weits[i];  
-	        				 if(weights[i] > maxweight) {
-	        					 maxweight = weights[i];
-	        				 }
+	        			      avgUpdatedWeights[i] += weits[i];
 	        			 }
 	        		 }
 	        	 }
-				 for(int i = 0; i<weights.length; i++) {
-					 weights[i] = weights[i]/maxweight;
-				 }
+	        	for(int i = 0; i<weights.length; i++) {
+                    avgUpdatedWeights[i] /= myFootmen.size()*enemyFootmen.size();
+                    if(avgUpdatedWeights[i]>maxweight) {
+                         maxweight=avgUpdatedWeights[i];
+                    }
+               }
+			 for(int i = 0; i<weights.length; i++) {
+			      avgUpdatedWeights[i] = avgUpdatedWeights[i]/maxweight;
+			 }
+			 for(int i = 0; i<weights.length; i++) {
+			      weights[i]=avgUpdatedWeights[i];
+                }
         	 }
         	  for(Integer myFootman:myFootmen) {
                    actions.put(myFootman, Action.createCompoundAttack(myFootman, selectAction(stateView,historyView,myFootman)));
@@ -247,23 +264,20 @@ public class RLAgent extends Agent {
     public void terminalStep(State.StateView stateView, History.HistoryView historyView) {
 
         // MAKE SURE YOU CALL printTestData after you finish a test episode.
-    	//System.out.println("numEpisodes is " + numEpisode + " number of test episodes is " + testEpisode);
-
-    	for(int i = 0; i<myFootmen.size(); i++) {
-    		totalReward +=  calculateReward(stateView, historyView, myFootmen.get(i));
-    	}
-    	
-    	if(testEpisode != 0 && testEpisode % 5 == 0) {
-        	testList.add(totalReward/5.0);
-    		totalReward = 0;
-    	}
-    	
-    	if(numEpisode != 0 && numEpisode % numEpisodes == 0 && testEpisode != 0 && testEpisode % 5 == 0) { 
-    		printTestData(testList);
-    	}
-        // Save your weights
-        saveWeights(weights);
-
+         	for(int i = 0; i<myFootmen.size(); i++) {
+         		totalReward +=  calculateReward(stateView, historyView, myFootmen.get(i));
+         	}
+         	
+         	if(testEpisode != 0 && testEpisode % 5 == 0) {
+             	testList.add(totalReward/5.0);
+         		totalReward = 0;
+         	}
+         	
+         	if(numEpisode != 0 && numEpisode % numEpisodes == 0 && testEpisode != 0 && testEpisode % 5 == 0) { 
+         		printTestData(testList);
+         	}
+             // Save your weights
+             saveWeights(weights);
     }
 
     /**
@@ -279,7 +293,6 @@ public class RLAgent extends Agent {
     public Double[] updateWeights(Double[] oldWeights, double[] oldFeatures, double totalReward, State.StateView stateView, History.HistoryView historyView, int footmanId) {
          Double[] newWeights=new Double[oldWeights.length];
          for(int i=0;i<oldWeights.length;i++) {
-                                             //not sure if this is right, \  -------------supposed to be Q(s',a')-------/ \--------supposed to be Q(s,a)---------------------/ FIXME
               newWeights[i]=oldWeights[i]+learningRate*(totalReward+gamma*getMaxQ(stateView,historyView,footmanId).getQ()+calcQFromWeightsAndFeatures(oldWeights,oldFeatures))*oldFeatures[i];
          }
         return newWeights;
@@ -295,7 +308,12 @@ public class RLAgent extends Agent {
      * @return The enemy footman ID this unit should attack
      */
     public int selectAction(State.StateView stateView, History.HistoryView historyView, int attackerId) {
-        return getMaxQ(stateView,historyView,attackerId).getDefender();
+         //if not a test episode and the random double is <= than epsilon, random action
+         if(numEpisode%10!=0 && random.nextDouble()<=decayedEpsilon) {
+              return enemyFootmen.get(random.nextInt(enemyFootmen.size()));
+         } else {
+              return getMaxQ(stateView,historyView,attackerId).getDefender();
+         }
     }
 
     /**
