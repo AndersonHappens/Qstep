@@ -51,7 +51,18 @@ public class RLAgent extends Agent {
      * Your Q-function weights.
      */
     public Double[] weights;
-
+    /**
+     * Actual number of episodes ran
+     */
+    public int numEpisode = 0;
+    /**
+     * Number of testEpisodes ran in this testing session
+     */
+    public int testEpisode = 0;
+    /**
+     * totalReward in test episodes so far
+     */
+    public double totalReward = 0;
     /**
      * These variables are set for you according to the assignment definition. You can change them,
      * but it is not recommended. If you do change them please let us know and explain your reasoning for
@@ -97,7 +108,16 @@ public class RLAgent extends Agent {
     public Map<Integer, Action> initialStep(State.StateView stateView, History.HistoryView historyView) {
 
         // You will need to add code to check if you are in a testing or learning episode
-
+    	if(numEpisode % 10 == 0 && (testEpisode == 0 || testEpisode %5 != 0)) {
+    		testEpisode++;
+    	} else {
+    		testEpisode = 0;
+    		numEpisode++;
+    	}
+    	if(numEpisode>numEpisodes) {
+    		System.out.println(numEpisodes + " completed. Quitting...");
+    		System.exit(0);
+    	}
         // Find all of your units
         myFootmen = new LinkedList<>();
         for (Integer unitId : stateView.getUnitIds(playernum)) {
@@ -166,10 +186,23 @@ public class RLAgent extends Agent {
         	        	  enemyFootmen.remove(e);
         	          }
         	     }
-        	 for(Integer myFootman: myFootmen) {
-        		 for(Integer enemy: enemyFootmen) {
-        			 weights = updateWeights(weights, calculateFeatureVector(stateView, historyView, myFootman, enemy), calculateReward(stateView, historyView, myFootman), stateView, historyView, myFootman); 
-        		 }
+        	 //update only if the current episode is not testing...
+        	 if(numEpisode % 10 != 0) { 
+	        	 Double maxweight = 1.0;
+	        	 for(Integer myFootman: myFootmen) {
+	        		 for(Integer enemy: enemyFootmen) {
+	        			 Double[] weits = updateWeights(weights, calculateFeatureVector(stateView, historyView, myFootman, enemy), calculateReward(stateView, historyView, myFootman), stateView, historyView, myFootman);
+	        			 for(int i = 0; i<weights.length; i++) {
+	        				 weights[i] += weits[i];  
+	        				 if(weights[i] > maxweight) {
+	        					 maxweight = weights[i];
+	        				 }
+	        			 }
+	        		 }
+	        	 }
+				 for(int i = 0; i<weights.length; i++) {
+					 weights[i] = weights[i]/maxweight;
+				 }
         	 }
         	  for(Integer myFootman:myFootmen) {
                    actions.put(myFootman, Action.createCompoundAttack(myFootman, selectAction(stateView,historyView,myFootman)));
@@ -210,7 +243,16 @@ public class RLAgent extends Agent {
     public void terminalStep(State.StateView stateView, History.HistoryView historyView) {
 
         // MAKE SURE YOU CALL printTestData after you finish a test episode.
-        
+    	System.out.println("numEpisodes is " + numEpisode + " number of test episodes is " + testEpisode);
+    	ArrayList<Double> testList = new ArrayList<Double>();
+    	for(int i = 0; i<myFootmen.size(); i++) {
+    		totalReward +=  calculateReward(stateView, historyView, myFootmen.get(i));
+    	}
+    	testList.add(totalReward/5.0);
+    	if(numEpisode % 10 == 0 && testEpisode != 0 && testEpisode % 5 == 0) { 
+    		printTestData(testList);
+    		totalReward = 0;
+    	}
         // Save your weights
         saveWeights(weights);
 
@@ -397,7 +439,6 @@ public class RLAgent extends Agent {
      * @param defenderId An enemy footman. The one you are considering attacking.
      * @return The array of feature function outputs.
      */
-    //JAKE CAN DO THIS THING HE THINKSES
     public double[] calculateFeatureVector(State.StateView stateView,
                                            History.HistoryView historyView,
                                            int attackerId,
@@ -514,7 +555,7 @@ public class RLAgent extends Agent {
      * DO NOT CHANGE THIS!
      *
      * This function will take your set of weights and save them to a file. Overwriting whatever file is
-     * currently there. You will use this when training your agents. You will include th output of this function
+     * currently there. You will use this when training your agents. You will include the output of this function
      * from your trained agent with your submission.
      *
      * Look in the agent_weights folder for the output.
