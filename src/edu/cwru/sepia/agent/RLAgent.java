@@ -280,6 +280,16 @@ public class RLAgent extends Agent {
          	
          	if(testEpisode != 0 && testEpisode % 5 == 0) {
              	testList.add(totalReward/5.0);
+             	boolean bestList = true;
+             	for(int i = 0; i < testList.size(); i++) {
+             		if(totalReward/5.0 < testList.get(i)) {
+             			bestList = false;
+             		}
+             	}
+             	if(bestList) {
+             		//save only the best weights
+             		saveWeights(weights);
+             	}
          		totalReward = 0;
          	}
          	
@@ -287,7 +297,9 @@ public class RLAgent extends Agent {
          		printTestData(testList);
          	}
              // Save your weights
-             saveWeights(weights);
+         	
+         	
+             //saveWeights(weights);
     }
 
     /**
@@ -545,7 +557,7 @@ public class RLAgent extends Agent {
     	double dist = DistanceMetrics.chebyshevDistance(unitview.getXPosition(), unitview.getYPosition(), enemy.getXPosition(), enemy.getYPosition()); 
     	return 1.0/dist;
     }
-    
+    //DO NOT USE OR EVERYTHING IS BADDDD
     private double getDistance(State.StateView stateView, int unitId, int enemyId) {
          Unit.UnitView unitview = stateView.getUnit(unitId); 
          Unit.UnitView enemy = stateView.getUnit(enemyId);
